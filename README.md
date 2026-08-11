@@ -12,7 +12,7 @@ for the full design doc this repo implements.
 ## Quick start (any team member, any OS)
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/ajin-s/MainProject.git
 cd smart-edusync
 python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
