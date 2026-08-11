@@ -1,0 +1,21 @@
+# --- shared / integration ---
+pydantic>=2.6
+python-dotenv>=1.0
+
+# --- part1_companion ---
+opencv-python>=4.9
+mediapipe>=0.10
+numpy>=1.26
+
+# --- part2_knowledge ---
+fastapi>=0.110
+uvicorn>=0.29
+sentence-transformers>=2.6
+faiss-cpu>=1.8
+pymupdf>=1.24
+langchain>=0.2
+networkx>=3.3
+
+# --- optional (install when you get to that module) ---
+# ollama            # local LLM runtime — install separately from ollama.com
+# paho-mqtt         # if you choose MQTT over asyncio pub-sub for the event bus
