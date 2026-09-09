@@ -1,17 +1,18 @@
-"""
-Phase 2 task (not day 1 priority): wire up TTS. Left as a stub with a clear interface so
-Part 2's tutor.response events have somewhere to go once this is implemented.
+def _speak_piper(self, text: str, params: dict) -> None:
+        """Local TTS implementation using pyttsx3 fallback for Windows."""
+        try:
+            import pyttsx3
+            engine = pyttsx3.init()
 
-TODO(Part 1 team):
-  - Pick a TTS provider: cloud (ElevenLabs) for expressiveness, or local (Piper) for offline demos.
-  - Map emotion/intervention level -> SSML (rate, pitch) per SRS Section 5.5.
-"""
-from integration.schemas import TutorResponse
+            # Adjust speed rate dynamically based on tone
+            base_rate = engine.getProperty('rate')
+            if params['label'] == 'gentle':
+                engine.setProperty('rate', base_rate - 40)
+            elif params['label'] == 'escalated':
+                engine.setProperty('rate', base_rate + 40)
 
-
-def speak(response: TutorResponse):
-    """
-    TODO: replace with a real TTS call. For now, just prints what would be spoken.
-    """
-    tone = response.ssml_hint or "neutral"
-    print(f"[TTS - {tone}] {response.text}")
+            print(f"[Local Audio - {params['label']}] Speaking...")
+            engine.say(text)
+            engine.runAndWait()
+        except Exception:
+            print(f"[TTS - {params['label']}] {text}")
