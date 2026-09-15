@@ -16,6 +16,10 @@ pymupdf>=1.24
 langchain>=0.2
 networkx>=3.3
 
+# --- optional image OCR for first-run material onboarding ---
+pillow>=10.0
+pytesseract>=0.3.10
+
 # --- optional (install when you get to that module) ---
 # ollama            # local LLM runtime — install separately from ollama.com
 # paho-mqtt         # if you choose MQTT over asyncio pub-sub for the event bus

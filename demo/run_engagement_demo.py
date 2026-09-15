@@ -36,7 +36,7 @@ async def _async_main(args: argparse.Namespace) -> None:
     if args.model_path:
         kwargs["model_path"] = args.model_path
     tracker = EngagementTracker(**kwargs)
-    await tracker.run(duration_s=args.duration)
+    await tracker.run(duration_s=args.duration, sim=args.sim)
 
 
 def main() -> None:
@@ -44,6 +44,7 @@ def main() -> None:
     parser.add_argument("--duration", type=float, default=10.0)
     parser.add_argument("--camera-index", type=int, default=0)
     parser.add_argument("--model-path", default=None)
+    parser.add_argument("--sim", action="store_true", help="Replay the deterministic trace instead of opening a camera")
     args = parser.parse_args()
 
     asyncio.run(_async_main(args))
