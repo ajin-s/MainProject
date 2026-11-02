@@ -1,0 +1,6 @@
+{
+  "name": "SmartEduSync — AI Tutoring Robot Control & Telemetry",
+  "description": "Privacy-first, emotion-aware tabletop AI tutoring robot control panel with real-time perception telemetry, Socratic tutor, BKT mastery tracking, and interactive hardware simulation.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
