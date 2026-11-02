@@ -1,30 +1,40 @@
-"""Master session: perception, intervention, RAG/GraphRAG tutor, BKT, voice, expression."""
-from __future__ import annotations
-
+"""
+Master Interactive Session Orchestrator for SmartEduSync Robot.
+Brings perception, intervention state machine, Socratic LLM, persona guardrail,
+verifier, memory, hardware expression, and voice into one active loop.
+"""
 import argparse
 import asyncio
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from integration.event_bus import bus
 from integration.schemas import (
+    EngagementUpdate,
     InterventionTrigger,
     TutorResponse,
+    TOPIC_ENGAGEMENT,
     TOPIC_INTERVENTION,
     TOPIC_TUTOR_RESPONSE,
 )
+
 from part1_companion.perception.engagement import EngagementTracker
 from part1_companion.intervention.state_machine import InterventionManager
-from part1_companion.mastery.bkt import get_student_context
+from part1_companion.mastery.bkt import get_student_context, update_mastery
+from part1_companion.persona.guardrail import check, rewrite
 from part1_companion.persona.accountability import nudge_student, respond_to_student_reply
 from part1_companion.voice.tts import speak
 from part1_companion.voice.stt import SpeechToText
+
 from part1_companion.hardware.servo import ServoController
 from part1_companion.hardware.display import RobotDisplay, WindowSink
 from part1_companion.expression.choreography import ChoreographyEngine
-from part2_knowledge.tutor.pipeline import run_tutor_turn
+
+from part2_knowledge.llm.dialogue import ask
+from part2_knowledge.graphrag.graph_build import expand_rag_context
+from part2_knowledge.tutor.socratic import generate_socratic_response
+from part2_knowledge.verify.verifier import is_grounded
+from part2_knowledge.memory.store import log_conversation, record_doubt
 
 
 class SmartEduSyncSession:
@@ -35,13 +45,17 @@ class SmartEduSyncSession:
         self.sim = sim
         self.silent = silent
         self.hardware = hardware
+
+        # Hardware & Display
         self.servos = ServoController(force_mock=hardware != "real")
         self.display = RobotDisplay(sink=WindowSink())
         self.choreo = ChoreographyEngine(self.servos)
+
+        # Managers & Voice
         self.intervention_mgr = InterventionManager(student_id=student_id)
         self.stt = SpeechToText(mode="fallback")
         self.awaiting_accountability_reply = False
-        self.perception_task = None
+
         self._setup_subscribers()
 
     def _setup_subscribers(self):
@@ -52,28 +66,41 @@ class SmartEduSyncSession:
     async def on_intervention_trigger(self, trigger: InterventionTrigger):
         context = get_student_context(self.student_id)
         topic = trigger.topic or context.get("active_topic", "General Studies")
+        mastery = context.get("p_mastery", 0.5)
+
+        # Persistent accountability nudge: factual, playful, and never insulting.
         response = TutorResponse(
-            text=nudge_student(self.student_id, context),
-            topic=topic,
-            confidence=1.0,
-            ssml_hint="playful",
+            text=nudge_student(self.student_id, context), topic=topic, confidence=1.0, ssml_hint="playful"
         )
         self.awaiting_accountability_reply = True
-        emo, face_art, _pose, _tone = self.choreo.express("intervention.trigger", {"level": trigger.level})
+
+        # Guardrail & Speech Choke Point
+        g_check, g_reason = check(response.text, context), check(response.text, context).get("reason")
+        if check(response.text, context)["verdict"] == "DENIED":
+            response.text = rewrite(response.text, context)
+
+        # Grounding Verifier
+        # Expressive Body & Face
+        emo, face_art, pose, tone = self.choreo.express("intervention.trigger", {"level": trigger.level})
         self.display.show_face(emo, face_art)
+
+        # Speak Response
         speak(response, silent=self.silent)
 
     async def on_tutor_response(self, response: TutorResponse):
-        emo, face_art, _pose, _tone = self.choreo.express("tutor.response", {})
+        emo, face_art, pose, tone = self.choreo.express("tutor.response", {})
         self.display.show_face(emo, face_art)
         speak(response, silent=self.silent)
 
     async def process_user_turn(self, text: str):
         if not text:
             return
+
         context = get_student_context(self.student_id)
         topic = context.get("active_topic", "General Studies")
-        mastery = float(context.get("p_mastery", 0.5))
+        mastery = context.get("p_mastery", 0.5)
+
+        log_conversation("session_1", "student", text)
 
         if self.awaiting_accountability_reply:
             tutor_res = TutorResponse(
@@ -86,17 +113,18 @@ class SmartEduSyncSession:
             await bus.publish(TOPIC_TUTOR_RESPONSE, tutor_res)
             return
 
-        tutor_res, diagnostics = run_tutor_turn(
-            self.student_id, text, topic, mastery, context, session_id="session_1"
-        )
-        if diagnostics.get("bkt"):
-            print(
-                f"[BKT] correct={diagnostics['bkt']['correct']} "
-                f"score={diagnostics['bkt']['score']} p_mastery={diagnostics['bkt']['p_mastery']}"
-            )
+        base_ctx = f"Syllabus material for {topic}."
+        rag_ctx = expand_rag_context(topic, base_ctx)
+
+        tutor_res = generate_socratic_response(topic, rag_ctx, mastery, ask_llm_fn=ask, student_message=text)
+
+        if check(tutor_res.text, context)["verdict"] == "DENIED":
+            tutor_res.text = rewrite(tutor_res.text, context)
+
         await bus.publish(TOPIC_TUTOR_RESPONSE, tutor_res)
 
     async def capture_accountability_reply(self) -> None:
+        """Capture microphone/typed fallback speech after a robot nudge and motivate the student."""
         if not self.awaiting_accountability_reply:
             return
         transcript = await asyncio.to_thread(self.stt.listen, "Reply to SmartEduSync > ")
@@ -106,21 +134,24 @@ class SmartEduSyncSession:
         print("\n=======================================================")
         print("    [SmartEduSync Tabletop Tutor Robot Active]    ")
         print("=======================================================\n")
+
+
+        # Start perception in background task
         tracker = EngagementTracker()
-        self.perception_task = asyncio.create_task(
-            tracker.run(duration_s=12.0 if self.sim else 0.0, sim=self.sim)
-        )
+        # Simulated traces are finite; the camera path stays active until the session closes.
+        self.perception_task = asyncio.create_task(tracker.run(duration_s=12.0 if self.sim else 0.0, sim=self.sim))
+
         await asyncio.sleep(1.0)
-        print("Session loop active. Ask a question, or wait for engagement intervention.\n")
+        print("Session loop active. You may ask questions or let perception run.\n")
 
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sim", action="store_true", default=True, help="synthetic perception trace")
-    parser.add_argument("--live", dest="sim", action="store_false", help="live webcam Face Mesh + Pose")
-    parser.add_argument("--silent", action="store_true")
+    parser.add_argument("--sim", action="store_true", default=True, help="run simulated perception trace")
+    parser.add_argument("--live", dest="sim", action="store_false", help="use the live webcam perception path")
+    parser.add_argument("--silent", action="store_true", help="suppress real audio output")
     parser.add_argument("--hardware", choices=("mock", "real"), default=os.getenv("HARDWARE", "mock"))
-    parser.add_argument("--once", action="store_true")
+    parser.add_argument("--once", action="store_true", help="run one example turn then exit")
     args = parser.parse_args()
 
     session = SmartEduSyncSession(sim=args.sim, silent=args.silent, hardware=args.hardware)
@@ -136,8 +167,7 @@ async def main():
     except (EOFError, KeyboardInterrupt):
         print("\n[SmartEduSync] Session closed.")
     finally:
-        if session.perception_task:
-            session.perception_task.cancel()
+        session.perception_task.cancel()
 
 
 if __name__ == "__main__":

@@ -4,11 +4,7 @@ Executes perception streams, interventions, BKT updates, Socratic dialogue, veri
 memory logging, and hardware register write assertions without crashing.
 """
 import asyncio
-import os
-import sys
 import time
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from integration.event_bus import bus
 from integration.session import SmartEduSyncSession

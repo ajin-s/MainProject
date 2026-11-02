@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, Optional, Union
 
 from integration.event_bus import bus
@@ -44,33 +44,13 @@ def init_db(db_path: str = DB_PATH) -> sqlite3.Connection:
 
     cursor.execute("SELECT COUNT(*) FROM exams")
     if cursor.fetchone()[0] == 0:
-        today = datetime.now().date()
-        cursor.executemany(
-            """
+        cursor.executemany("""
             INSERT INTO exams (subject, exam_date) VALUES (?, ?)
-            """,
-            [
-                ("Calculus Integrals", (today + timedelta(days=2)).isoformat()),
-                ("Robotics", (today + timedelta(days=5)).isoformat()),
-                ("Linear Algebra", (today + timedelta(days=12)).isoformat()),
-            ],
-        )
-
-    today_iso = datetime.now().date().isoformat()
-    cursor.execute("SELECT COUNT(*) FROM exams WHERE exam_date >= ?", (today_iso,))
-    if cursor.fetchone()[0] == 0:
-        today = datetime.now().date()
-        cursor.executemany(
-            """
-            INSERT INTO exams (subject, exam_date) VALUES (?, ?)
-            ON CONFLICT(subject) DO UPDATE SET exam_date = excluded.exam_date
-            """,
-            [
-                ("Calculus Integrals", (today + timedelta(days=2)).isoformat()),
-                ("Robotics", (today + timedelta(days=5)).isoformat()),
-                ("Linear Algebra", (today + timedelta(days=12)).isoformat()),
-            ],
-        )
+        """, [
+            ("Calculus Integrals", "2026-09-18"),
+            ("Linear Algebra", "2026-09-25"),
+            ("Robotics", "2026-09-20"),
+        ])
 
     conn.commit()
     return conn

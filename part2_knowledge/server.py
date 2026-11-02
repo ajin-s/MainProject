@@ -4,11 +4,14 @@ Exposes POST /chat endpoint with session tracking, RAG, GraphRAG, Socratic LLM, 
 """
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 
-from part1_companion.mastery.bkt import get_student_context
+from part2_knowledge.llm.dialogue import ask
+from part2_knowledge.graphrag.graph_build import expand_rag_context
+from part2_knowledge.tutor.socratic import generate_socratic_response
+from part2_knowledge.verify.verifier import is_grounded
+from part2_knowledge.memory.store import log_conversation, record_doubt
 from part2_knowledge.rag.material_library import MaterialError, StudyMaterialLibrary
-from part2_knowledge.tutor.pipeline import run_tutor_turn
 
 app = FastAPI(title="SmartEduSync Knowledge Engine API", version="1.0.0")
 materials = StudyMaterialLibrary()
@@ -77,18 +80,29 @@ def add_material_url(payload: MaterialUrlRequest):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat_endpoint(req: ChatRequest):
-    facts = get_student_context(req.student_id)
-    topic = req.topic or facts.get("active_topic") or "General Studies"
-    mastery = req.mastery if req.mastery is not None else float(facts.get("p_mastery", 0.5))
-    tutor_res, diagnostics = run_tutor_turn(
-        req.student_id, req.message, topic, mastery, facts, session_id=req.session_id
+    topic = req.topic or "General Studies"
+    log_conversation(req.session_id, "student", req.message)
+
+    material_context = materials.retrieve_context(req.student_id, req.message)
+    base_context = material_context or f"Syllabus material for {topic}: Key concepts involve core problem solving and reasoning."
+    context = expand_rag_context(topic, base_context)
+
+    tutor_res = generate_socratic_response(
+        topic, context, req.mastery, ask_llm_fn=ask, student_message=req.message
     )
+    grounded = is_grounded(tutor_res.text, [context])
+
+    if not grounded:
+        tutor_res.text = f"Let's reason about {topic} together. What is the first step you would take?"
+
+    log_conversation(req.session_id, "tutor", tutor_res.text)
+
     return ChatResponse(
         text=tutor_res.text,
         ssml_hint=tutor_res.ssml_hint or "neutral",
         topic=topic,
         confidence=tutor_res.confidence,
-        grounded=bool(diagnostics.get("grounded", True)),
+        grounded=grounded,
     )
 
 

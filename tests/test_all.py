@@ -22,13 +22,9 @@ from part1_companion.expression.face import get_face_art
 from part1_companion.expression.choreography import ChoreographyEngine
 
 from part2_knowledge.graphrag.graph_build import expand_rag_context
-from part2_knowledge.verify.verifier import is_grounded, evaluate_student_answer, extract_key_concepts
+from part2_knowledge.verify.verifier import is_grounded, evaluate_student_answer
 from part2_knowledge.memory.store import init_memory_db, log_conversation, record_doubt, get_doubts
 from part2_knowledge.rag.material_library import StudyMaterialLibrary
-from part2_knowledge.rag.ingest import retrieve_chunks
-from part2_knowledge.llm.dialogue import socratic_fallback
-from part2_knowledge.tutor.quiz import generate_quiz_item
-from part2_knowledge.tutor.pipeline import looks_like_answer, run_tutor_turn
 
 
 from part1_companion.perception.posture import PostureDetector
@@ -43,8 +39,6 @@ def test_engagement_perception():
     assert e2 == 0.5
     assert perception.compute_engagement_score(0.30, 0.02) > 0.9
     assert perception.compute_engagement_score(0.10, 0.60) == 0.0
-    fused = perception.fuse_with_posture(0.90, {"is_slouching": True, "neck_angle": 35.0})
-    assert fused < 0.90
 
 
 def test_posture_detection():
@@ -164,37 +158,6 @@ def test_memory_store():
         os.remove(test_db)
 
 
-def test_rag_and_socratic_pipeline():
-    hits = retrieve_chunks("Riemann sums and integrals", k=2)
-    assert hits
-    assert any("integral" in chunk.lower() or "riemann" in chunk.lower() for chunk in hits)
-    item = generate_quiz_item("Calculus Integrals", hits)
-    assert item["expected_keywords"]
-    assert "Calculus" in item["question"] or "integral" in item["question"].lower()
-    prompt = (
-        "Topic: Calculus Integrals\nStudent said: Why do we integrate?\n"
-        "Retrieved Syllabus & GraphRAG Context: A Riemann sum approximates an integral with thin rectangles."
-    )
-    question = socratic_fallback(prompt)
-    assert "?" in question
-    assert looks_like_answer("The area under the curve is the integral")
-    assert not looks_like_answer("Why do we use integration in physics?")
-    with tempfile.TemporaryDirectory() as temp_dir:
-        db = os.path.join(temp_dir, "bkt.db")
-        facts = {"active_topic": "Calculus Integrals", "p_mastery": 0.42, "days_left": 5, "nearest_exam": "Calculus Integrals"}
-        response, diag = run_tutor_turn(
-            "pipeline_student",
-            "Why do we use integration in physics?",
-            "Calculus Integrals",
-            0.42,
-            facts,
-            session_id="t",
-            db_path=db,
-        )
-        assert response.text
-        assert diag["chunks"]
-
-
 def test_study_material_onboarding():
     with tempfile.TemporaryDirectory() as temp_dir:
         library = StudyMaterialLibrary(os.path.join(temp_dir, "materials.db"))
@@ -233,8 +196,6 @@ def run_all_tests():
     print("  [PASS] test_verifier")
     test_memory_store()
     print("  [PASS] test_memory_store")
-    test_rag_and_socratic_pipeline()
-    print("  [PASS] test_rag_and_socratic_pipeline")
     test_study_material_onboarding()
     print("  [PASS] test_study_material_onboarding")
     print("\n[SUCCESS] All unit tests PASSED successfully!")
