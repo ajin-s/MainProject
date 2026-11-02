@@ -14,8 +14,36 @@ export type InterventionLevel = 'IDLE' | 'GENTLE' | 'MODERATE' | 'HIGH';
 
 export type ExamRisk = 'low' | 'medium' | 'high';
 
+export type LearningStyle = 'Intuitive & Analogy' | 'Mathematical & Rigorous' | 'Applied & Hands-on';
+
+export interface StudentProfile {
+  student_id: string;
+  name: string;
+  major: string;
+  year: string;
+  preferredStyle: LearningStyle;
+  targetGoal: string;
+  isFirstTime: boolean;
+  createdAt: string;
+}
+
+export interface LearnerCharacterisation {
+  cognitivePace: 'deliberate' | 'balanced' | 'fast-paced';
+  conceptualStrength: string[];
+  growthAreas: string[];
+  postureFatigueIndex: number; // 0 to 100
+  focusResilience: number; // 0 to 100
+  preferredTone: 'encouraging' | 'analytical' | 'direct';
+  sessionsCount: number;
+  totalQuestionsAnswered: number;
+  averageMastery: number;
+  graphRAGSummary: string;
+  personalityTags: string[];
+}
+
 export interface StudentContext {
   student_id: string;
+  student_name?: string;
   active_topic: string;
   p_mastery: number;
   nearest_exam: string;
@@ -37,6 +65,7 @@ export interface ChatMessage {
   topic?: string;
   timestamp: string;
   ssml_hint?: string;
+  emotion?: EmotionState;
 }
 
 export interface StudyMaterialItem {
@@ -54,6 +83,14 @@ export interface ConceptNode {
   category: string;
   mastery: number;
   connections: string[];
+  isStudentPersona?: boolean;
+}
+
+export interface ConceptEdge {
+  from: string;
+  to: string;
+  relation: string;
+  weight?: number;
 }
 
 export interface QuizItem {
@@ -71,9 +108,9 @@ export interface TelemetryState {
   E_t: number;
   emotion: EmotionState;
   posture: PostureStatus;
-  neck_angle: number;
-  is_slouching: boolean;
-  intervention_level: InterventionLevel;
+  neckAngle: number;
+  isSlouching: boolean;
+  interventionLevel: InterventionLevel;
   active_topic: string;
   p_mastery: number;
   days_left: number;

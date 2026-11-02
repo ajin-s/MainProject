@@ -1,4 +1,4 @@
-import { StudentContext, QuizItem } from '../types';
+import { StudentContext, QuizItem, EmotionState } from '../types';
 import { expandRagContext } from './graphrag';
 import { checkGuardrails, rewriteGuardrailResponse } from './guardrail';
 
@@ -6,10 +6,99 @@ export interface SocraticResult {
   text: string;
   grounded: boolean;
   ssmlHint: 'neutral' | 'encouraging' | 'inquiring' | 'urgent';
+  emotion: EmotionState;
   concept: string;
 }
 
 export const SAMPLE_QUIZZES: Record<string, QuizItem[]> = {
+  'Artificial Intelligence': [
+    {
+      id: 'ai-1',
+      topic: 'Artificial Intelligence',
+      concept: 'A* Heuristic Search',
+      question: 'For the A* search algorithm to be mathematically guaranteed to find the optimal path on a tree, what property must the heuristic function h(n) satisfy?',
+      options: [
+        'h(n) must always be equal to zero.',
+        'h(n) must be admissible: it never overestimates the true cost to reach the goal (h(n) ≤ h*(n)).',
+        'h(n) must be strictly strictly greater than the actual cost g(n).',
+        'h(n) must be negative to incentivize fast node expansion.'
+      ],
+      correctIndex: 1,
+      explanation: 'An admissible heuristic never overestimates the true remaining cost, guaranteeing that A* expands the optimal path first.'
+    },
+    {
+      id: 'ai-2',
+      topic: 'Artificial Intelligence',
+      concept: 'Alpha-Beta Pruning',
+      question: 'In adversarial game search, under what condition does Alpha-Beta pruning safely prune a subtree without affecting the minimax outcome?',
+      options: [
+        'When the search depth reaches an even number.',
+        'Whenever alpha becomes greater than or equal to beta (α ≥ β).',
+        'When the evaluation score drops to exactly zero.',
+        'Only when the opponent is playing sub-optimally.'
+      ],
+      correctIndex: 1,
+      explanation: 'When α ≥ β, the current player or opponent already has a guaranteed better or equal move elsewhere, so exploring this branch cannot change the decision.'
+    },
+    {
+      id: 'ai-3',
+      topic: 'Artificial Intelligence',
+      concept: 'Knowledge Representation',
+      question: 'What is the key principle behind Resolution Refutation in Propositional Logic theorem proving?',
+      options: [
+        'Assuming the theorem is false, converting to Conjunctive Normal Form (CNF), and deriving a contradiction (empty clause).',
+        'Calculating the Euclidean distance between propositions.',
+        'Pruning states using depth-first iterative deepening.',
+        'Randomly assigning truth values until all clauses evaluate to True.'
+      ],
+      correctIndex: 0,
+      explanation: 'Resolution refutation negates the goal clause, adds it to the knowledge base in CNF, and uses the resolution rule to derive a contradiction (nil/empty clause).'
+    }
+  ],
+  'Machine Learning': [
+    {
+      id: 'ml-1',
+      topic: 'Machine Learning',
+      concept: 'Gradient Descent',
+      question: 'If the learning rate α in Gradient Descent is set excessively high, what failure mode commonly occurs?',
+      options: [
+        'The model will underfit by getting stuck immediately at the initial weights.',
+        'The loss function will oscillate wildly and diverge away from the local or global minimum.',
+        'The gradients will instantly vanish to zero.',
+        'The dataset will automatically shuffle.'
+      ],
+      correctIndex: 1,
+      explanation: 'An overly large learning rate causes the updates to overshoot the minimum valley, leading to catastrophic divergence of the loss.'
+    },
+    {
+      id: 'ml-2',
+      topic: 'Machine Learning',
+      concept: 'Overfitting & Regularization',
+      question: 'How does L1 Regularization (Lasso) differ fundamentally from L2 Regularization (Ridge) regarding feature selection?',
+      options: [
+        'L1 adds an absolute value penalty (|w|), driving non-essential feature weights to exactly zero for sparse feature selection.',
+        'L1 squares the weights while L2 takes the square root.',
+        'L2 always removes 50% of all features from the neural network.',
+        'There is no mathematical difference; both behave identically.'
+      ],
+      correctIndex: 0,
+      explanation: 'The sharp corner of the L1 diamond constraint boundary forces irrelevant parameter weights directly to 0, producing inherent feature sparsity.'
+    },
+    {
+      id: 'ml-3',
+      topic: 'Machine Learning',
+      concept: 'Backpropagation & Neural Networks',
+      question: 'What fundamental calculus rule enables Backpropagation to efficiently compute weight gradients across deep neural network layers?',
+      options: [
+        'The Chain Rule of multivariable calculus (∂L/∂w = ∂L/∂a · ∂a/∂z · ∂z/∂w).',
+        'Integration by Parts.',
+        'L\'Hopital\'s Rule.',
+        'Taylor Series Expansion only.'
+      ],
+      correctIndex: 0,
+      explanation: 'Backpropagation is an efficient application of the multivariable Chain Rule, propagating error signals backwards from output loss to each parameter.'
+    }
+  ],
   'Calculus Integrals': [
     {
       id: 'calc-1',
@@ -38,15 +127,6 @@ export const SAMPLE_QUIZZES: Record<string, QuizItem[]> = {
       ],
       correctIndex: 0,
       explanation: 'The Fundamental Theorem connects differentiation and definite integration as inverse operations.'
-    },
-    {
-      id: 'calc-3',
-      topic: 'Calculus Integrals',
-      concept: 'Definite Integrals',
-      question: 'If ∫ from 1 to 4 of 2x dx is evaluated, what is the result?',
-      options: ['12', '15', '16', '8'],
-      correctIndex: 1,
-      explanation: 'The antiderivative is x². Evaluating from 1 to 4: 4² - 1² = 16 - 1 = 15.'
     }
   ],
   'Linear Algebra': [
@@ -63,15 +143,6 @@ export const SAMPLE_QUIZZES: Record<string, QuizItem[]> = {
       ],
       correctIndex: 1,
       explanation: 'λ is the eigenvalue indicating by how much the eigenvector v is scaled during the linear transformation.'
-    },
-    {
-      id: 'la-2',
-      topic: 'Linear Algebra',
-      concept: 'Matrix Multiplication',
-      question: 'To multiply matrix A (size m×k) with matrix B (size p×n), which condition must hold?',
-      options: ['m must equal n', 'k must equal p', 'm must equal p', 'k must equal n'],
-      correctIndex: 1,
-      explanation: 'The number of columns of A (k) must equal the number of rows of B (p).'
     }
   ],
   'Robotics': [
@@ -115,49 +186,81 @@ export function generateSocraticResponse(
 ): SocraticResult {
   const topic = context.active_topic;
   const mastery = context.p_mastery;
+  const studentName = context.student_name || 'student';
+
   const baseContext = customMaterials.length > 0 
     ? customMaterials.join(' ')
-    : `Official course syllabus for ${topic}. Covers fundamentals, theorems, definitions, and applications.`;
+    : `Official course syllabus for ${topic}. Covers fundamentals, theorems, definitions, algorithms, and real-world implementations.`;
   
-  const expandedRag = expandRagContext(topic, baseContext);
+  const expandedRag = expandRagContext(topic, baseContext, studentName);
   const q = studentMessage.toLowerCase().trim();
 
   let text: string;
   let ssmlHint: 'neutral' | 'encouraging' | 'inquiring' | 'urgent' = 'inquiring';
+  let emotion: EmotionState = 'thinking';
 
-  // Topic specific intelligence
-  if (q.includes('why') || q.includes('how') || q.includes('what is') || q.includes('explain') || q.includes('integral') || q.includes('matrix')) {
-    if (mastery < 0.5) {
-      // Scaffolding & intuitive analogies
-      if (topic === 'Calculus Integrals') {
-        text = `Think of an integral like finding the total distance covered when your speedometer speed is constantly changing. Instead of multiplying constant speed × time, we add together millions of tiny time slices! If you look at your graph, what do you notice about the area under the curve?`;
-      } else if (topic === 'Linear Algebra') {
-        text = `Picture a grid sheet of rubber. A matrix is just an operation that stretches, rotates, or shears that sheet! What happens to the basis vectors (1,0) and (0,1) when you apply the transformation?`;
+  // Topic specific pedagogical intelligence
+  if (topic === 'Artificial Intelligence') {
+    if (q.includes('a*') || q.includes('heuristic') || q.includes('search')) {
+      if (mastery < 0.5) {
+        text = `Think of A* search like using GPS navigation on your phone. You have the actual distance you've driven so far, plus a smart estimated straight-line distance to your destination. Why is it vital that this estimate never overestimates the real road distance?`;
+        emotion = 'curious';
+        ssmlHint = 'encouraging';
       } else {
-        text = `Let's break this down into a bite-sized piece. In ${topic}, we build up from the basics. What is the first key term that stands out to you from this problem?`;
+        text = `Right! In A* search, f(n) = g(n) + h(n). If our heuristic is consistent (monotonic), what mathematical guarantee does that provide regarding re-visiting or reopening already expanded states?`;
+        emotion = 'happy';
+        ssmlHint = 'inquiring';
       }
-      ssmlHint = 'encouraging';
-    } else if (mastery < 0.7) {
-      // Guided questioning
-      if (topic === 'Calculus Integrals') {
-        text = `Good question. Consider the Fundamental Theorem of Calculus: if F'(x) = f(x), then ∫ from a to b of f(x) dx is F(b) - F(a). How does this connect the slope of a curve with the accumulated area underneath?`;
-      } else {
-        text = `You're on the right track! In ${topic}, consider how this concept connects to ${expandRagContext(topic, '').split(':')[1] || 'core theorems'}. How would you set up the initial equation?`;
-      }
+    } else if (q.includes('minimax') || q.includes('alpha') || q.includes('beta') || q.includes('game')) {
+      text = `In game tree search, imagine Minimax as two grandmasters: you maximize your score while assuming your opponent plays the optimal counter. When we prune with Alpha-Beta, why doesn't ignoring those pruned subtrees risk missing a winning move?`;
+      emotion = 'curious';
       ssmlHint = 'inquiring';
     } else {
-      // High mastery: edge cases & deep synthesis
-      text = `Excellent! Since your mastery in ${topic} is strong (${Math.round(mastery * 100)}%), here is a challenge: how does this behave under non-continuous boundary conditions or when applying it to real-time robotic servo kinematics?`;
+      text = `Great inquiry about ${topic}. In AI systems, we translate fuzzy real-world reasoning into formal representations. What specific algorithm or problem representation should we break down first?`;
+      emotion = 'happy';
+      ssmlHint = 'encouraging';
+    }
+  } else if (topic === 'Machine Learning') {
+    if (q.includes('gradient') || q.includes('descent') || q.includes('loss')) {
+      if (mastery < 0.5) {
+        text = `Picture standing on a foggy hillside blindfolded, trying to reach the lowest lake. You feel the slope with your boots and take a small step downhill. That slope is your gradient, and the lake is your minimal loss! What happens if your steps are way too giant?`;
+        emotion = 'curious';
+        ssmlHint = 'encouraging';
+      } else {
+        text = `Spot on. With Gradient Descent, θ ← θ - α ∇L(θ). What happens to convergence when the loss landscape has an ill-conditioned Hessian matrix with steep narrow ravines, and how do momentum optimizers like Adam help?`;
+        emotion = 'happy';
+        ssmlHint = 'inquiring';
+      }
+    } else if (q.includes('overfit') || q.includes('regularization') || q.includes('backprop')) {
+      text = `Overfitting is like memorizing the exact answers on last year's exam instead of learning the underlying concepts! When we apply L2 regularization, how does penalizing large weights keep the model smooth and generalizable?`;
+      emotion = 'curious';
+      ssmlHint = 'inquiring';
+    } else {
+      text = `Machine Learning is all about finding mathematical patterns from data. What part of the learning pipeline—loss function, optimization, or generalization—would you like to explore?`;
+      emotion = 'happy';
+      ssmlHint = 'encouraging';
+    }
+  } else if (q.includes('why') || q.includes('how') || q.includes('what is') || q.includes('explain')) {
+    if (mastery < 0.5) {
+      text = `Let's break this down into an intuitive picture. In ${topic}, we start with the simplest core principle before diving into equations. What is the central goal of this concept in your own words?`;
+      emotion = 'curious';
+      ssmlHint = 'encouraging';
+    } else if (mastery < 0.7) {
+      text = `Good question, ${studentName}. In ${topic}, notice how this connects to our syllabus context: ${expandedRag.slice(0, 100)}... How would you set up the initial relationship?`;
+      emotion = 'thinking';
+      ssmlHint = 'inquiring';
+    } else {
+      text = `Impressive! Since your mastery in ${topic} is strong (${Math.round(mastery * 100)}%), here is a deeper question: how would this principle hold up under boundary conditions or noisy real-world data?`;
+      emotion = 'happy';
       ssmlHint = 'neutral';
     }
   } else if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
-    text = `Greetings! I'm SmartEduSync. We are tracking your progress on ${topic} (${Math.round(mastery * 100)}% mastery). What concept would you like to explore or solve together?`;
+    text = `Hello ${studentName}! I'm SmartEduSync. Your active subject is ${topic} (${Math.round(mastery * 100)}% mastery). What concept or homework problem shall we conquer together?`;
+    emotion = 'happy';
     ssmlHint = 'encouraging';
-  } else if (q.includes('quiz') || q.includes('test') || q.includes('practice')) {
-    text = `Let's test your knowledge! Click the 'Test Knowledge (BKT Quiz)' button above or ask me a specific problem you want to check your reasoning on.`;
-    ssmlHint = 'inquiring';
   } else {
-    text = `Interesting point regarding "${studentMessage}". In ${topic}, notice how this relates to our syllabus context. Would you like to review the core definition or try a sample calculation?`;
+    text = `Regarding "${studentMessage}" in ${topic}: let's examine the foundational definition and see how we can apply it. Would you like a step-by-step example or a conceptual analogy?`;
+    emotion = 'thinking';
     ssmlHint = 'inquiring';
   }
 
@@ -165,12 +268,14 @@ export function generateSocraticResponse(
   const guard = checkGuardrails(text, context);
   if (guard.verdict === 'DENIED') {
     text = rewriteGuardrailResponse(text, context);
+    emotion = 'concerned';
   }
 
   return {
     text,
     grounded: true,
     ssmlHint,
+    emotion,
     concept: topic,
   };
 }

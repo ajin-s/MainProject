@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
-import { INITIAL_CONCEPT_NODES, KNOWLEDGE_GRAPH_EDGES } from '../logic/graphrag';
-import { Network, Sparkles, X, GitCommit } from 'lucide-react';
+import { BASE_CONCEPT_NODES, BASE_KNOWLEDGE_GRAPH_EDGES } from '../logic/graphrag';
+import { ConceptNode, ConceptEdge, StudentProfile, LearnerCharacterisation } from '../types';
+import { Network, Sparkles, X, User, ArrowRight } from 'lucide-react';
 
 interface ConceptGraphModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeTopic: string;
   onSelectTopic: (topic: string) => void;
+  studentProfile?: StudentProfile;
+  characterisation?: LearnerCharacterisation;
+  nodes?: ConceptNode[];
+  edges?: ConceptEdge[];
 }
 
 export const ConceptGraphModal: React.FC<ConceptGraphModalProps> = ({
@@ -14,66 +19,104 @@ export const ConceptGraphModal: React.FC<ConceptGraphModalProps> = ({
   onClose,
   activeTopic,
   onSelectTopic,
+  studentProfile,
+  characterisation,
+  nodes = BASE_CONCEPT_NODES,
+  edges = BASE_KNOWLEDGE_GRAPH_EDGES,
 }) => {
   if (!isOpen) return null;
 
   const [selectedNode, setSelectedNode] = useState<string>(activeTopic);
 
-  const selectedNodeData = INITIAL_CONCEPT_NODES.find(
+  const selectedNodeData = nodes.find(
     (n) => n.id.toLowerCase() === selectedNode.toLowerCase()
   );
 
-  const connectedEdges = KNOWLEDGE_GRAPH_EDGES.filter(
+  const connectedEdges = edges.filter(
     (e) =>
       e.from.toLowerCase() === selectedNode.toLowerCase() ||
       e.to.toLowerCase() === selectedNode.toLowerCase()
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="bg-[#121a2b] border border-white/15 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative text-slate-800">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2 mb-2 text-purple-400 text-xs font-mono font-semibold uppercase">
+        <div className="flex items-center gap-2 mb-1.5 text-indigo-600 text-xs font-mono font-semibold uppercase">
           <Network className="w-4 h-4" />
-          <span>GraphRAG • NetworkX Concept Topology & 1-Hop Expansion</span>
+          <span>GraphRAG • Concept Topology &amp; Student Persona Network</span>
         </div>
 
-        <h3 className="text-lg font-bold text-white mb-1">Interactive Syllabus Knowledge Graph</h3>
-        <p className="text-xs text-gray-400 mb-5">
-          Select concepts to inspect prerequisite relations, subtopics, and RAG context expansions.
+        <h3 className="text-lg font-bold text-slate-900 mb-1">
+          Knowledge Graph &amp; Learner Characterisation
+        </h3>
+        <p className="text-xs text-slate-500 mb-4">
+          Select concepts or the Student Persona node to inspect prerequisite relations, weak spots, and 1-hop expansions.
         </p>
 
-        {/* Nodes Grid / Visualizer */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5 max-h-56 overflow-y-auto pr-1">
-          {INITIAL_CONCEPT_NODES.map((node) => {
+        {/* Dynamic Persona Node Pill if present */}
+        {studentProfile && (
+          <div className="p-3 mb-4 bg-indigo-50/70 border border-indigo-100 rounded-xl flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-indigo-600" />
+              <div>
+                <span className="font-bold text-indigo-900">
+                  Learner Node: {studentProfile.name}
+                </span>
+                <span className="text-slate-500 block text-[11px]">
+                  Style: {studentProfile.preferredStyle} • Goal: {studentProfile.targetGoal}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedNode(`Learner: ${studentProfile.name}`)}
+              className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] transition-colors"
+            >
+              Inspect Persona Node
+            </button>
+          </div>
+        )}
+
+        {/* Nodes Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4 max-h-52 overflow-y-auto pr-1">
+          {nodes.map((node) => {
             const isCurrent = node.id === selectedNode;
             const isActiveTopic = node.id === activeTopic;
+            const isPersona = node.isStudentPersona;
             return (
               <button
                 key={node.id}
                 onClick={() => setSelectedNode(node.id)}
                 className={`p-3 rounded-xl border text-left transition-all ${
                   isCurrent
-                    ? 'bg-purple-600/30 border-purple-500 shadow-md shadow-purple-500/20'
-                    : 'bg-black/30 border-white/10 hover:border-white/25 text-gray-300'
+                    ? 'bg-indigo-50 border-indigo-600 shadow-sm'
+                    : isPersona
+                    ? 'bg-purple-50/60 border-purple-200 text-slate-800'
+                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/10 text-gray-300">
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-semibold ${
+                      isPersona
+                        ? 'bg-indigo-100 text-indigo-800'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
                     {node.category}
                   </span>
                   {isActiveTopic && (
-                    <span className="text-[9px] font-bold text-cyan-400 font-mono">ACTIVE</span>
+                    <span className="text-[9px] font-bold text-indigo-600 font-mono">ACTIVE</span>
                   )}
                 </div>
-                <div className="text-xs font-bold text-white truncate">{node.name}</div>
-                <div className="text-[10px] text-gray-400 font-mono mt-1">
+                <div className="text-xs font-bold text-slate-900 truncate">{node.name}</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                   Mastery: {Math.round(node.mastery * 100)}%
                 </div>
               </button>
@@ -83,42 +126,44 @@ export const ConceptGraphModal: React.FC<ConceptGraphModalProps> = ({
 
         {/* Selected Node Details & Connected Edges */}
         {selectedNodeData && (
-          <div className="p-4 rounded-xl bg-black/40 border border-white/10 space-y-3">
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs font-bold text-purple-300 uppercase font-mono">
-                  Active Node: {selectedNodeData.name}
+                <span className="text-xs font-bold text-indigo-900 uppercase font-mono">
+                  Inspecting: {selectedNodeData.name}
                 </span>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  1-Hop Neighbors expand the Socratic LLM context prompt during dialogue.
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  1-Hop Neighbors expand the Socratic LLM context prompt and track student strengths.
                 </p>
               </div>
-              {selectedNodeData.name !== activeTopic && (
+              {!selectedNodeData.isStudentPersona && selectedNodeData.name !== activeTopic && (
                 <button
                   onClick={() => {
                     onSelectTopic(selectedNodeData.name);
                     onClose();
                   }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-sm"
                 >
-                  Set as Active Topic
+                  Set as Active Subject
                 </button>
               )}
             </div>
 
-            <div className="text-xs text-gray-300">
-              <span className="font-semibold text-gray-400 block mb-1.5">Direct Graph Relations:</span>
+            <div className="text-xs text-slate-700">
+              <span className="font-semibold text-slate-600 block mb-1.5">
+                Connected Semantic Graph Edges:
+              </span>
               <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                 {connectedEdges.map((edge, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between bg-white/5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono"
+                    className="flex items-center justify-between bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-[11px] font-mono shadow-sm"
                   >
-                    <span className="text-gray-300">{edge.from}</span>
-                    <span className="text-purple-400 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-[10px]">
+                    <span className="text-slate-800 font-medium truncate max-w-[150px]">{edge.from}</span>
+                    <span className="text-indigo-600 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] font-semibold">
                       -- [{edge.relation}] --&gt;
                     </span>
-                    <span className="text-gray-300">{edge.to}</span>
+                    <span className="text-slate-800 font-medium truncate max-w-[150px]">{edge.to}</span>
                   </div>
                 ))}
               </div>

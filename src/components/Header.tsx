@@ -1,5 +1,6 @@
 import React from 'react';
-import { Bot, Sparkles, Volume2, VolumeX } from 'lucide-react';
+import { Bot, Sparkles, Volume2, VolumeX, User, ChevronDown } from 'lucide-react';
+import { StudentProfile } from '../types';
 
 interface HeaderProps {
   activeTopic: string;
@@ -8,6 +9,8 @@ interface HeaderProps {
   ttsEnabled: boolean;
   onToggleTts: () => void;
   onOpenGraph: () => void;
+  studentProfile: StudentProfile;
+  onOpenProfile: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,68 +20,84 @@ export const Header: React.FC<HeaderProps> = ({
   ttsEnabled,
   onToggleTts,
   onOpenGraph,
+  studentProfile,
+  onOpenProfile,
 }) => {
   return (
-    <header className="flex flex-col md:flex-row md:items-center justify-between pb-5 border-b border-white/10 mb-6 gap-4">
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 rounded-xl flex items-center justify-center font-bold text-xl text-white shadow-[0_0_20px_rgba(59,130,246,0.5)] border border-white/20">
-          <Bot className="w-6 h-6" />
+    <header className="bg-white border border-slate-200/80 rounded-2xl px-5 py-4 mb-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center gap-3.5">
+        <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-sm">
+          <Bot className="w-5 h-5 text-indigo-400" />
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-white">SmartEduSync</h1>
-            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-mono">v2.0</span>
+            <h1 className="text-base font-bold text-slate-900 tracking-tight">SmartEduSync</h1>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-mono">
+              v2.5
+            </span>
+            <span className="hidden sm:inline-block text-[11px] font-medium text-slate-500">
+              AI Tutoring Robot &amp; Defense Telemetry
+            </span>
           </div>
-          <p className="text-xs text-gray-400">Privacy-First Tabletop AI Tutoring Robot & Defense Console</p>
+          <p className="text-xs text-slate-500">
+            Privacy-first tabletop robot with emotion sensing, BKT mastery &amp; GraphRAG syllabus
+          </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-300">
-          <span className="text-gray-400 font-medium">Topic:</span>
+        {/* Student Profile Pill */}
+        <button
+          onClick={onOpenProfile}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 transition-colors shadow-sm"
+          title="Manage Student Profile & GraphRAG Learner Persona"
+        >
+          <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
+            {studentProfile.name.charAt(0).toUpperCase()}
+          </div>
+          <span className="truncate max-w-[100px]">{studentProfile.name}</span>
+          <ChevronDown className="w-3 h-3 text-slate-400" />
+        </button>
+
+        {/* Topic Selector */}
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 shadow-sm">
+          <span className="text-slate-400 font-medium">Subject:</span>
           <select
             value={activeTopic}
             onChange={(e) => onTopicChange(e.target.value)}
-            className="bg-transparent text-cyan-400 font-semibold focus:outline-none cursor-pointer"
+            className="bg-transparent text-slate-900 font-semibold focus:outline-none cursor-pointer"
           >
             {availableTopics.map((t) => (
-              <option key={t} value={t} className="bg-gray-900 text-white">
+              <option key={t} value={t} className="bg-white text-slate-900">
                 {t}
               </option>
             ))}
           </select>
         </div>
 
+        {/* Concept Graph Button */}
         <button
           onClick={onOpenGraph}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 transition-colors"
-          title="Inspect GraphRAG Concept Graph"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors shadow-sm"
+          title="Inspect GraphRAG Concept Graph & Student Persona"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Concept Graph</span>
+          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+          <span>GraphRAG</span>
         </button>
 
+        {/* Emotional TTS Toggle */}
         <button
           onClick={onToggleTts}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shadow-sm ${
             ttsEnabled
-              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-              : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+              : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
           }`}
-          title="Toggle Robot Voice TTS synthesis"
+          title="Toggle Robot Emotional Voice Synthesis"
         >
-          {ttsEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-          <span>{ttsEnabled ? 'TTS Voice Active' : 'TTS Muted'}</span>
+          {ttsEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5" />}
+          <span>{ttsEnabled ? 'Emotional Voice' : 'Voice Muted'}</span>
         </button>
-
-        <div className="hidden lg:flex items-center gap-2">
-          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
-            Team 1: Perception & Emotion
-          </span>
-          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30">
-            Team 2: Socratic LLM & RAG
-          </span>
-        </div>
       </div>
     </header>
   );

@@ -5,32 +5,51 @@ export interface TopicMastery {
   p_mastery: number;
   nearest_exam: string;
   days_left: number;
+  department: string;
 }
 
 export const INITIAL_TOPICS: Record<string, TopicMastery> = {
+  'Artificial Intelligence': {
+    topic: 'Artificial Intelligence',
+    p_mastery: 0.48,
+    nearest_exam: 'Artificial Intelligence',
+    days_left: 4,
+    department: 'Computer Science',
+  },
+  'Machine Learning': {
+    topic: 'Machine Learning',
+    p_mastery: 0.52,
+    nearest_exam: 'Machine Learning',
+    days_left: 6,
+    department: 'Computer Science',
+  },
   'Calculus Integrals': {
     topic: 'Calculus Integrals',
     p_mastery: 0.42,
     nearest_exam: 'Calculus Integrals',
     days_left: 3,
+    department: 'Mathematics',
   },
   'Linear Algebra': {
     topic: 'Linear Algebra',
     p_mastery: 0.78,
     nearest_exam: 'Linear Algebra',
     days_left: 7,
+    department: 'Mathematics',
   },
   'Robotics': {
     topic: 'Robotics',
     p_mastery: 0.50,
     nearest_exam: 'Robotics',
     days_left: 12,
+    department: 'Engineering',
   },
   'Control Systems': {
     topic: 'Control Systems',
     p_mastery: 0.35,
     nearest_exam: 'Control Systems',
     days_left: 2,
+    department: 'Engineering',
   },
 };
 
