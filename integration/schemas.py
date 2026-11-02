@@ -16,7 +16,11 @@ class EngagementUpdate(BaseModel):
     """Published by Part 1 Perception Service at ~5 Hz."""
     E_t: float = Field(..., ge=0.0, le=1.0, description="Fused engagement score, 0=disengaged, 1=fully engaged")
     emotion: str = Field(..., description="e.g. 'engaged', 'confused', 'frustrated', 'bored'")
+    posture: Optional[str] = Field("UPRIGHT", description="e.g. 'UPRIGHT', 'SLOUCHING'")
+    neck_angle: Optional[float] = Field(0.0, description="Neck inclination angle in degrees")
+    is_slouching: Optional[bool] = Field(False, description="True if student is slouching")
     ts: float = Field(default_factory=time.time)
+
 
 
 class InterventionTrigger(BaseModel):

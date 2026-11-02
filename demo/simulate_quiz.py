@@ -1,16 +1,9 @@
-"""
-demo/simulate_quiz.py
-
-Simulates a student answering a few questions on a topic, so update_mastery()
-visibly changes p_mastery over the course of a short session. No real quiz
-content needed - just correct/incorrect per question.
+"""Socratic quiz from RAG chunks, scored with keyword overlap and BKT updates.
 
 Usage:
-    python -m demo.simulate_quiz                          # interactive, type y/n per question
-    python -m demo.simulate_quiz --auto                    # scripted answers, no typing needed
-    python -m demo.simulate_quiz --student s1 --topic Algebra --auto
+    python -m demo.simulate_quiz --auto
+    python -m demo.simulate_quiz --student student_1 --topic "Calculus Integrals"
 """
-
 from __future__ import annotations
 
 import argparse
@@ -19,36 +12,41 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from part1_companion.mastery.bkt import get_mastery, init_db, update_mastery  # noqa: E402
-
-# Used only in --auto mode, so there's something to demo without typing anything.
-AUTO_ANSWERS = [True, True, False, True, False]
+from part1_companion.mastery.bkt import get_mastery, init_db, update_mastery
+from part2_knowledge.memory.store import record_answer_outcome
+from part2_knowledge.tutor.quiz import generate_quiz
+from part2_knowledge.verify.verifier import evaluate_student_answer
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--student", default="demo_student")
-    parser.add_argument("--topic", default="Robotics")
-    parser.add_argument("--auto", action="store_true", help="use a canned answer sequence instead of typing")
-    parser.add_argument("--questions", type=int, default=5, help="number of fake questions to ask")
+    parser.add_argument("--student", default="student_1")
+    parser.add_argument("--topic", default="Calculus Integrals")
+    parser.add_argument("--auto", action="store_true")
+    parser.add_argument("--questions", type=int, default=5)
     args = parser.parse_args()
 
     conn = init_db()
     p = get_mastery(conn, args.student, args.topic)
     print(f"Starting mastery for {args.student} on {args.topic!r}: {p:.3f}\n")
 
-    for i in range(args.questions):
+    items = generate_quiz(args.topic, n=args.questions)
+    for i, item in enumerate(items, 1):
+        print(f"Q{i}: {item['question']}")
+        keywords = list(item["expected_keywords"])
         if args.auto:
-            correct = AUTO_ANSWERS[i % len(AUTO_ANSWERS)]
-            print(f"Q{i + 1}: (auto) answered {'correctly' if correct else 'incorrectly'}")
+            correct_answer = " ".join(keywords[:4]) or item["source"]
+            student_text = correct_answer if i % 2 == 1 else "I am not sure about this yet."
+            print(f"  (auto) {student_text}")
         else:
-            answer = input(f"Q{i + 1}: did the student answer correctly? (y/n): ").strip().lower()
-            correct = answer.startswith("y")
+            student_text = input("  Your answer: ").strip()
 
+        correct, score = evaluate_student_answer(item["question"], keywords, student_text)
         p = update_mastery(conn, args.student, args.topic, correct=correct)
-        print(f"  -> p_mastery now {p:.3f}")
+        record_answer_outcome(args.student, args.topic, correct)
+        print(f"  -> {'correct' if correct else 'needs review'} (score={score:.2f}) p_mastery={p:.3f}\n")
 
-    print(f"\nFinal mastery after {args.questions} questions: {p:.3f}")
+    print(f"Final mastery after {args.questions} questions: {p:.3f}")
 
 
 if __name__ == "__main__":

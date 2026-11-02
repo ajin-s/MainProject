@@ -26,9 +26,10 @@ def main():
 
     print()
     if ok:
-        print("✅ environment OK — you're ready to write code.")
+        print("[OK] environment OK - you're ready to write code.")
     else:
-        print("⚠️  some packages failed to import — re-run: pip install -r requirements.txt")
+        print("[WARNING] some packages failed to import - re-run: pip install -r requirements.txt")
+
         sys.exit(1)
 
 if __name__ == "__main__":
